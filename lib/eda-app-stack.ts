@@ -10,7 +10,9 @@ import * as subs from "aws-cdk-lib/aws-sns-subscriptions";
 import * as iam from "aws-cdk-lib/aws-iam";
 
 import { Construct } from "constructs";
-// import * as sqs from 'aws-cdk-lib/aws-sqs';
+import { Duration, RemovalPolicy } from "aws-cdk-lib";
+import { SqsDestination } from "aws-cdk-lib/aws-lambda-destinations";
+import { AttributeType, BillingMode, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
 
 export class EDAAppStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -22,13 +24,17 @@ export class EDAAppStack extends cdk.Stack {
       publicReadAccess: false,
     });
 
-        // Integration infrastructure
+    // Integration infrastructure
 
     const imageProcessQueue = new sqs.Queue(this, "img-created-queue", {
       receiveMessageWaitTime: cdk.Duration.seconds(10),
     });
 
     const mailerQ = new sqs.Queue(this, "mailer-queue", {
+      receiveMessageWaitTime: cdk.Duration.seconds(10),
+    });
+
+    const negMailQ = new sqs.Queue(this, "neg-mail-queue", {
       receiveMessageWaitTime: cdk.Duration.seconds(10),
     });
 
@@ -42,7 +48,6 @@ export class EDAAppStack extends cdk.Stack {
     this,
     "ProcessImageFn",
     {
-      // architecture: lambda.Architecture.ARM_64,
       runtime: lambda.Runtime.NODEJS_18_X,
       entry: `${__dirname}/../lambdas/processImage.ts`,
       timeout: cdk.Duration.seconds(15),
@@ -57,6 +62,13 @@ export class EDAAppStack extends cdk.Stack {
     entry: `${__dirname}/../lambdas/mailer.ts`,
   });
 
+  const negMailFn = new lambdanode.NodejsFunction(this, "neg-mail-function", {
+    runtime: lambda.Runtime.NODEJS_16_X,
+    memorySize: 1024,
+    timeout: cdk.Duration.seconds(3),
+    entry: `${__dirname}/../lambdas/negMail.ts`,
+  });
+
   // Event triggers
 
   imagesBucket.addEventNotification(
@@ -65,7 +77,23 @@ export class EDAAppStack extends cdk.Stack {
 );
 
 newImageTopic.addSubscription(
-  new subs.SqsSubscription(imageProcessQueue)
+  new subs.SqsSubscription(imageProcessQueue, {
+    filterPolicyWithMessageBody: {
+      Records: sns.FilterOrPolicy.policy({
+        s3: sns.FilterOrPolicy.policy({
+          object: sns.FilterOrPolicy.policy({
+            key: sns.FilterOrPolicy.filter(
+              sns.SubscriptionFilter.stringFilter({
+                matchPrefixes: ["*.jpeg", "*.png"],
+              }),
+
+            ),
+          }),
+        }),
+      })
+    },
+    rawMessageDelivery: true,
+  })
 );
 
 newImageTopic.addSubscription(new subs.SqsSubscription(mailerQ));
@@ -80,14 +108,31 @@ newImageTopic.addSubscription(new subs.SqsSubscription(mailerQ));
     maxBatchingWindow: cdk.Duration.seconds(10),
   }); 
 
-  processImageFn.addEventSource(newImageEventSource);
+  const newNegImageMailEventSource = new events.SqsEventSource(negMailQ, {
+    batchSize: 5,
+    maxBatchingWindow: cdk.Duration.seconds(10),
+  }); 
+
   mailerFn.addEventSource(newImageMailEventSource);
+  negMailFn.addEventSource(newNegImageMailEventSource);
 
   // Permissions
 
   imagesBucket.grantRead(processImageFn);
 
   mailerFn.addToRolePolicy(
+    new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        "ses:SendEmail",
+        "ses:SendRawEmail",
+        "ses:SendTemplatedEmail",
+      ],
+      resources: ["*"],
+    })
+  );
+
+  negMailFn.addToRolePolicy(
     new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: [
