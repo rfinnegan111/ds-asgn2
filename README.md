@@ -11,4 +11,4 @@ Phase 1.
 
     Confirmation Mailer - Attempt Implementation.
     Rejection Mailer - Attempt Implementation.
-    Process Image - Attempt Implementation implemented
+    Process Image - Attempt Implementation.
