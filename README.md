@@ -9,6 +9,6 @@ Phase 1.
 
 [ List the Lambda functions in this phase's architecture and state their working status.]
 
-    Confirmation Mailer - Attempt Implementation.
-    Rejection Mailer - Attempt Implementation.
-    Process Image - Attempt Implementation.
+    Confirmation Mailer - Fully Implementated.
+    Rejection Mailer - Partially Implemented - faulty filter cannot test.
+    Process Image - Partially Implemented - faulty filtering and not items not appearing in DynamoDB Table.
