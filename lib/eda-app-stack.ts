@@ -22,12 +22,6 @@ export class EDAAppStack extends cdk.Stack {
       publicReadAccess: false,
     });
 
-    // Output
-    
-    new cdk.CfnOutput(this, "bucketName", {
-      value: imagesBucket.bucketName,
-    });
-
         // Integration infrastructure
 
     const imageProcessQueue = new sqs.Queue(this, "img-created-queue", {
