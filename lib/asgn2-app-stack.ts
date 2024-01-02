@@ -143,8 +143,8 @@ newImageTopic.addSubscription(new subs.SqsSubscription(mailerQ));
 
   // Permissions
 
-  imagesBucket.grantRead(processImageFn);
-  imageTable.grantWriteData(processImageFn);
+  imagesBucket.grantReadWrite(processImageFn);
+  imageTable.grantReadWriteData(processImageFn);
 
   mailerFn.addToRolePolicy(
     new iam.PolicyStatement({
