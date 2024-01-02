@@ -40,11 +40,15 @@ export const handler: SQSHandler = async (event) => {
         }
 
         const imageName = s3e.object.key;
+        const dynamoDBItem = {
+          imageKey: imageName
+        }
+
         try {
           await ddbClient.send(
                 new PutCommand({
                   TableName: process.env.TABLE_NAME,
-                  Item:  imageName ,
+                  Item:  dynamoDBItem ,
                 })
               );
           console.log(`Successful image process ${imageName}`);
