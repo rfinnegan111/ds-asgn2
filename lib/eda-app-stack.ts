@@ -15,8 +15,6 @@ import { SqsDestination } from "aws-cdk-lib/aws-lambda-destinations";
 import { AttributeType, BillingMode, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
 import { StartingPosition } from "aws-cdk-lib/aws-lambda";
 import { DynamoEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
-import { DynamoDB, DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 
 export class EDAAppStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {

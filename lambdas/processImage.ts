@@ -1,3 +1,5 @@
+//fix this code
+
 import { SQSHandler } from "aws-lambda";
 import {
   GetObjectCommand,
@@ -9,6 +11,7 @@ import {
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBStreamHandler } from "aws-lambda";
 
 const s3 = new S3Client();
 const ddbClient = new DynamoDBClient({ region: process.env.REGION });
@@ -41,7 +44,7 @@ export const handler: SQSHandler = async (event) => {
 
         const imageName = s3e.object.key;
         const dynamoDBItem = {
-          imageKey: imageName
+          key: imageName
         }
 
         try {
@@ -58,5 +61,22 @@ export const handler: SQSHandler = async (event) => {
 
       }
     }
+  }
+};
+
+export const dynamohandler: DynamoDBStreamHandler = async (event) => {
+  try {
+    for (const record of event.Records) {
+      if (record.eventName === "INSERT") {
+        const imageInfo = record.dynamodb?.NewImage;
+        const img = imageInfo?.img; 
+
+        
+        console.log(`Image added to DynamoDB: ${img}`);
+      }
+    }
+  } catch (error) {
+    console.error(`Error processing DynamoDB stream: ${error}`);
+    throw error;
   }
 };
