@@ -1,5 +1,4 @@
 import { SQSHandler } from "aws-lambda";
-// import AWS from 'aws-sdk';
 import { SES_EMAIL_FROM, SES_EMAIL_TO, SES_REGION } from "../env";
 import {
   SESClient,
@@ -9,7 +8,7 @@ import {
 
 if (!SES_EMAIL_TO || !SES_EMAIL_FROM || !SES_REGION) {
   throw new Error(
-    "Please add the SES_EMAIL_TO, SES_EMAIL_FROM and SES_REGION environment variables in an env.js file located in the root directory"
+    "Please add SES_EMAIL_TO, SES_EMAIL_FROM and SES_REGION variables in an env.ts file located in root"
   );
 }
 
@@ -32,11 +31,10 @@ export const handler: SQSHandler = async (event: any) => {
       for (const messageRecord of snsMessage.Records) {
         const s3e = messageRecord.s3;
         const srcBucket = s3e.bucket.name;
-        // Object key may have spaces or unicode non-ASCII characters.
         const srcKey = decodeURIComponent(s3e.object.key.replace(/\+/g, " "));
         try {
           const { name, email, message }: ContactDetails = {
-            name: "The Photo Album",
+            name: "Album",
             email: SES_EMAIL_FROM,
             message: `We received your Image. Its URL is s3://${srcBucket}/${srcKey}`,
           };
@@ -44,7 +42,6 @@ export const handler: SQSHandler = async (event: any) => {
           await client.send(new SendEmailCommand(params));
         } catch (error: unknown) {
           console.log("ERROR is: ", error);
-          // return;
         }
       }
     }

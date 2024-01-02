@@ -16,7 +16,7 @@ import { AttributeType, BillingMode, StreamViewType, Table } from "aws-cdk-lib/a
 import { StartingPosition } from "aws-cdk-lib/aws-lambda";
 import { DynamoEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 
-export class EDAAppStack extends cdk.Stack {
+export class AsgnCA2AppStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 

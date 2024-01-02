@@ -1,5 +1,3 @@
-//fix this code
-
 import { SQSHandler } from "aws-lambda";
 import {
   GetObjectCommand,
