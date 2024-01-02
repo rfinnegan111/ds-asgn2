@@ -13,6 +13,10 @@ import { Construct } from "constructs";
 import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import { SqsDestination } from "aws-cdk-lib/aws-lambda-destinations";
 import { AttributeType, BillingMode, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
+import { StartingPosition } from "aws-cdk-lib/aws-lambda";
+import { DynamoEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
+import { DynamoDB, DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 
 export class EDAAppStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -24,10 +28,27 @@ export class EDAAppStack extends cdk.Stack {
       publicReadAccess: false,
     });
 
+    const imageTable = new Table(this, "ImageTable", {
+      billingMode: BillingMode.PAY_PER_REQUEST,
+      partitionKey: { name: "imageName", type: AttributeType.STRING },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      tableName: "Images",
+      stream: StreamViewType.NEW_IMAGE,
+    })
+
     // Integration infrastructure
+
+    const failImageQueue = new sqs.Queue(this, "img-fail-queue", {
+      receiveMessageWaitTime: cdk.Duration.seconds(10),
+      retentionPeriod: Duration.minutes(30),
+    });
 
     const imageProcessQueue = new sqs.Queue(this, "img-created-queue", {
       receiveMessageWaitTime: cdk.Duration.seconds(10),
+      deadLetterQueue: {
+        queue: failImageQueue,
+        maxReceiveCount: 2,
+      },
     });
 
     const mailerQ = new sqs.Queue(this, "mailer-queue", {
@@ -50,8 +71,13 @@ export class EDAAppStack extends cdk.Stack {
     {
       runtime: lambda.Runtime.NODEJS_18_X,
       entry: `${__dirname}/../lambdas/processImage.ts`,
+      onFailure: new SqsDestination(failImageQueue),
       timeout: cdk.Duration.seconds(15),
       memorySize: 128,
+      environment: {
+        REGION: cdk.Aws.REGION,
+        TABLE_NAME: imageTable.tableName,
+      },
     }
   );
 
@@ -73,7 +99,7 @@ export class EDAAppStack extends cdk.Stack {
 
   imagesBucket.addEventNotification(
     s3.EventType.OBJECT_CREATED,
-    new s3n.SnsDestination(newImageTopic)  // Changed
+    new s3n.SnsDestination(newImageTopic)  
 );
 
 newImageTopic.addSubscription(
@@ -98,11 +124,6 @@ newImageTopic.addSubscription(
 
 newImageTopic.addSubscription(new subs.SqsSubscription(mailerQ));
 
-  const newImageEventSource = new events.SqsEventSource(imageProcessQueue, {
-    batchSize: 5,
-    maxBatchingWindow: cdk.Duration.seconds(10),
-  });
-
   const newImageMailEventSource = new events.SqsEventSource(mailerQ, {
     batchSize: 5,
     maxBatchingWindow: cdk.Duration.seconds(10),
@@ -116,9 +137,16 @@ newImageTopic.addSubscription(new subs.SqsSubscription(mailerQ));
   mailerFn.addEventSource(newImageMailEventSource);
   negMailFn.addEventSource(newNegImageMailEventSource);
 
+  processImageFn.addEventSource(
+    new DynamoEventSource(imageTable, {
+      startingPosition: StartingPosition.LATEST,
+    })
+  )
+
   // Permissions
 
   imagesBucket.grantRead(processImageFn);
+  imageTable.grantWriteData(processImageFn);
 
   mailerFn.addToRolePolicy(
     new iam.PolicyStatement({

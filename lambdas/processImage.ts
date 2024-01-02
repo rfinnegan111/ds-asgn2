@@ -7,7 +7,11 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+
 const s3 = new S3Client();
+const ddbClient = new DynamoDBClient({ region: process.env.REGION });
 
 export const handler: SQSHandler = async (event) => {
   console.log("Event ", event);
@@ -21,7 +25,6 @@ export const handler: SQSHandler = async (event) => {
       for (const messageRecord of recordBody.Records) {
         const s3e = messageRecord.s3;
         const srcBucket = s3e.bucket.name;
-        
         const srcKey = decodeURIComponent(s3e.object.key.replace(/\+/g, " "));
         const typeMatch = srcKey.match(/\.([^.]*)$/);
 
@@ -34,6 +37,19 @@ export const handler: SQSHandler = async (event) => {
         if (imageType != "jpeg" && imageType != "png") {
           console.log(`Unsupported type: ${imageType}`);
           throw new Error("Unsupported type: ${imageType. ");
+        }
+
+        const imageName = s3e.object.key;
+        try {
+          await ddbClient.send(
+                new PutCommand({
+                  TableName: process.env.TABLE_NAME,
+                  Item:  imageName ,
+                })
+              );
+          console.log(`Successful image process ${imageName}`);
+        } catch (error) {
+          console.error(`Failed image process ${imageName}: ${error}`);
         }
 
       }
